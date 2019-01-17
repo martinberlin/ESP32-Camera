@@ -2,8 +2,9 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <WiFiClient.h>
+#include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
 
-#define ENABLE_OLED //if want use oled ,turn on thi macro
+#define ENABLE_OLED 
 
 #ifdef ENABLE_OLED
 #include "SSD1306.h"
@@ -12,12 +13,9 @@
 #define I2C_SCL 13
 SSD1306Wire display(OLED_ADDRESS, I2C_SDA, I2C_SCL, GEOMETRY_128_32);
 #endif
-
+long photoCount = 0;
 OV2640 cam;
 WebServer server(80);
-
-const char *ssid =     "<your wifi ssid>";         // Put your SSID here
-const char *password = "<your wifi password>";     // Put your PASSWORD here
 
 void handle_jpg_stream(void)
 {
@@ -57,6 +55,11 @@ void handle_jpg(void)
   response += "Content-type: image/jpeg\r\n\r\n";
   server.sendContent(response);
   client.write((char *)cam.getfb(), cam.getSize());
+  
+  photoCount++;
+  Serial.println(String(photoCount));
+  display.drawString(0, 10, "Photos taken: "+String(photoCount));
+  display.display();
 }
 
 void handleNotFound()
@@ -74,12 +77,18 @@ void handleNotFound()
 
 void setup()
 {
+  #ifdef ENABLE_OLED
+  display.init();
+  display.flipScreenVertically();
+  display.setFont(ArialMT_Plain_10);
+  #endif
   Serial.begin(115200);
-  while (!Serial)
-  {
-    ;
-  }
-
+  WiFiManager wifiManager;
+    //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
+  wifiManager.setAPCallback(configModeCallback);
+  wifiManager.setBreakAfterConfig(true); // Without this saveConfigCallback does not get fired
+  wifiManager.setSaveConfigCallback(saveConfigCallback);
+  wifiManager.autoConnect("AutoConnectAP");
   camera_config_t camera_config;
   camera_config.ledc_channel = LEDC_CHANNEL_0;
   camera_config.ledc_timer = LEDC_TIMER_0;
@@ -101,36 +110,52 @@ void setup()
   camera_config.xclk_freq_hz = 20000000;
   camera_config.pixel_format = CAMERA_PF_JPEG;
   camera_config.frame_size = CAMERA_FS_SVGA;
-
   cam.init(camera_config);
 
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(F("."));
-  }
   Serial.println(F("WiFi connected"));
   Serial.println("");
   Serial.println(WiFi.localIP());
-
-#ifdef ENABLE_OLED
-  display.init();
-  display.flipScreenVertically();
-  display.setFont(ArialMT_Plain_16);
-  display.setTextAlignment(TEXT_ALIGN_CENTER);
-  display.drawString(128 / 2, 32 / 2, WiFi.localIP().toString());
+  display.clear();
+  display.drawString(0, 0, "Station: "+WiFi.localIP().toString());
   display.display();
-#endif
-
+  
   server.on("/", HTTP_GET, handle_jpg_stream);
   server.on("/jpg", HTTP_GET, handle_jpg);
   server.onNotFound(handleNotFound);
   server.begin();
 }
 
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  Serial.println(WiFi.softAPIP());
+  //if you used auto generated SSID, print it
+  Serial.println(myWiFiManager->getConfigPortalSSID());
+  display.drawString(0, 0, "Connect to:"+myWiFiManager->getConfigPortalSSID());
+  display.drawString(0, 10, "And set up cam WiFi in:");
+  display.drawString(0, 20, IpAddress2String(WiFi.softAPIP()));
+  display.display();
+}
+
+void saveConfigCallback() {
+  display.clear();
+  display.drawString(0, 0, "Saving configuration");
+  display.display();
+  delay(500);
+}
+
+/**
+ * Convert the IP to string so we can send the display
+ */
+String IpAddress2String(const IPAddress& ipAddress)
+{
+  return String(ipAddress[0]) + String(".") +\
+  String(ipAddress[1]) + String(".") +\
+  String(ipAddress[2]) + String(".") +\
+  String(ipAddress[3])  ;
+}
+
 void loop()
 {
   server.handleClient();
+  delay(400);
 }
