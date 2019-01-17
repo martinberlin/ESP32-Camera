@@ -1,6 +1,9 @@
-ESP32 Camera Ardunio Library
+ESP32 Camera Library
 ====================
-Each example is tested using the TTGO T-Journal.
+This library was forked from TTGO T-Journal original library with the intention to add :
+
+- WiFi manager
+- After researching, image comparision using a library such as https://github.com/mapbox/pixelmatch-cpp to match pixels and upload a image to the net only when something really changes
 
 ![jpg](./images/TTGOcam.jpg)
 
