@@ -29,6 +29,13 @@ void handle_jpg_stream(void)
     cam.run();
     if (!client.connected())
       break;
+    photoCount++;
+    display.setColor(BLACK);
+    display.fillRect(0,12,128,20);
+    display.setColor(WHITE);
+    display.drawString(0, 12, "Captures: "+String(photoCount));
+    display.display();
+  
     response = "--frame\r\n";
     response += "Content-Type: image/jpeg\r\n\r\n";
     server.sendContent(response);
@@ -50,16 +57,12 @@ void handle_jpg(void)
     Serial.println("fail ... \n");
     return;
   }
+  
   String response = "HTTP/1.1 200 OK\r\n";
   response += "Content-disposition: inline; filename=capture.jpg\r\n";
   response += "Content-type: image/jpeg\r\n\r\n";
   server.sendContent(response);
   client.write((char *)cam.getfb(), cam.getSize());
-  
-  photoCount++;
-  Serial.println(String(photoCount));
-  display.drawString(0, 10, "Photos taken: "+String(photoCount));
-  display.display();
 }
 
 void handleNotFound()
