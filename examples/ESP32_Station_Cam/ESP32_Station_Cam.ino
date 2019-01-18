@@ -3,7 +3,7 @@
 #include <WebServer.h>
 #include <WiFiClient.h>
 #include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
-
+#include <ESPmDNS.h>
 #define ENABLE_OLED 
 
 #ifdef ENABLE_OLED
@@ -13,6 +13,7 @@
 #define I2C_SCL 13
 SSD1306Wire display(OLED_ADDRESS, I2C_SDA, I2C_SCL, GEOMETRY_128_32);
 #endif
+char* localDomain        = "cam1";              // mDNS: cam1.local
 long photoCount = 0;
 OV2640 cam;
 WebServer server(80);
@@ -31,9 +32,9 @@ void handle_jpg_stream(void)
       break;
     photoCount++;
     display.setColor(BLACK);
-    display.fillRect(0,12,128,20);
+    display.fillRect(0,22,128,20);
     display.setColor(WHITE);
-    display.drawString(0, 12, "Captures: "+String(photoCount));
+    display.drawString(0, 22, "Captures: "+String(photoCount));
     display.display();
   
     response = "--frame\r\n";
@@ -114,14 +115,23 @@ void setup()
   camera_config.pixel_format = CAMERA_PF_JPEG;
   camera_config.frame_size = CAMERA_FS_SVGA;
   cam.init(camera_config);
-
+  // Multicast DNS
+  if (!MDNS.begin(localDomain)) {
+    while(1) { 
+      delay(500);
+    }
+  }
+  // Add service to MDNS-SD
+  MDNS.addService("http", "tcp", 80);
+    
   Serial.println(F("WiFi connected"));
   Serial.println("");
   Serial.println(WiFi.localIP());
   display.clear();
-  display.drawString(0, 0, "Station: "+WiFi.localIP().toString());
+  display.drawString(0, 0,  "Station: "+WiFi.localIP().toString());
+  display.drawString(0, 10, "mDns: "+String(localDomain)+".local");
   display.display();
-  
+
   server.on("/", HTTP_GET, handle_jpg_stream);
   server.on("/jpg", HTTP_GET, handle_jpg);
   server.onNotFound(handleNotFound);
