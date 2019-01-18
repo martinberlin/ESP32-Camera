@@ -1,19 +1,31 @@
 #include "OV2640.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <WiFiManager.h>
 #include <ArduinoJson.h>
 #include "time.h"
+#define ENABLE_OLED 
+
+#ifdef ENABLE_OLED
+#include "SSD1306.h"
+#define OLED_ADDRESS 0x3c
+#define I2C_SDA 14
+#define I2C_SCL 13
+SSD1306Wire display(OLED_ADDRESS, I2C_SDA, I2C_SCL, GEOMETRY_128_32);
+#endif
 
 #define HTTPS_HOST              "www.bigiot.net"
 #define HTTPS_PORT              443
-#define BIGIOT_API_KEY          "<Your BIGIOT API Key>"      // Put your API Key here
-#define BIGIOT_DEVICE_ID        "<Your BIGIOT Device ID>"
-#define BIGIOT_INTERFACE_ID     "<Your BIGIOT Interface ID>"
-const char *ssid =              "<Your wifi ssid>";      // Put your SSID here
-const char *password =          "<Your wifi password>";  // Put your PASSWORD here
-const char *ntpServer =         "pool.ntp.org";
+#define BIGIOT_API_KEY          ""      // Put your API Key here
+#define BIGIOT_DEVICE_ID        "9110"
+#define BIGIOT_INTERFACE_ID     "7832"
+const char *ssid =     "KabelBox-A210";         // Put your SSID here
+const char *password = "14237187131701431551";
+
+long photoCount = 0;
+const char *ntpServer = "pool.ntp.org";
 const long gmtOffset_sec =      3600;
-const int daylightOffset_sec =  3600;
+const int daylightOffset_sec =  0;
 
 char *request_content = "--------------------------ef73a32d43e7f04d\r\n"
                         "Content-Disposition: form-data; name=\"data\"; filename=\"%s.jpg\"\r\n"
@@ -96,10 +108,16 @@ void update_image(void)
 
     client.find("\r\n");
 
+    display.setColor(BLACK);
+    display.fillRect(0,22,128,20);
+    display.setColor(WHITE);
+        
     bzero(status, sizeof(status));
     client.readBytesUntil('\r', status, sizeof(status));
     if (strncmp(status, "HTTP/1.1 200 OK", strlen("HTTP/1.1 200 OK")))
     {
+        display.drawString(0, 22, "Response status error");
+        display.display();
         Serial.print("Unexpected response: ");
         Serial.println(status);
         client.stop();
@@ -126,13 +144,17 @@ void update_image(void)
     if (!root.success())
     {
         Serial.println("parse data fail");
+        display.drawString(0, 22, "Response parse failed");
+        display.display();
         client.stop();
         free(str);
         return;
     }
     if (!strcmp((const char *)root["R"], "1"))
     {
-        Serial.println("Update Success");
+        photoCount++;
+        display.drawString(0, 22, "Captures: "+String(photoCount)+" "+timeinfo.tm_hour+":"+timeinfo.tm_min);
+        display.display();
     }
     free(str);
     client.stop();
@@ -140,11 +162,23 @@ void update_image(void)
 
 void setup()
 {
+    #ifdef ENABLE_OLED
+      display.init();
+      display.flipScreenVertically();
+      display.setFont(ArialMT_Plain_10);
+    #endif
     Serial.begin(115200);
-    while (!Serial)
-    {
-        ;
-    }
+    WiFiManager wifiManager;
+    //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
+    wifiManager.setAPCallback(configModeCallback);
+    wifiManager.setBreakAfterConfig(true); // Without this saveConfigCallback does not get fired
+    wifiManager.setSaveConfigCallback(saveConfigCallback);
+    wifiManager.autoConnect("AutoConnectAP");
+    display.clear();
+    display.drawString(0, 0,  "Camera online");
+    display.drawString(0, 10, "BIGIOT device: "BIGIOT_DEVICE_ID);
+    display.display();
+  
     camera_config_t camera_config;
     camera_config.ledc_channel = LEDC_CHANNEL_0;
     camera_config.ledc_timer = LEDC_TIMER_0;
@@ -168,23 +202,41 @@ void setup()
     camera_config.frame_size = CAMERA_FS_SVGA;
 
     cam.init(camera_config);
+  
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+}
 
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
-    while (WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-        Serial.print(F("."));
-    }
-    Serial.println(F("WiFi connected"));
-    Serial.println("");
-    Serial.println(WiFi.localIP());
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  Serial.println(WiFi.softAPIP());
+  //if you used auto generated SSID, print it
+  Serial.println(myWiFiManager->getConfigPortalSSID());
+  display.drawString(0, 0, "Connect to:"+myWiFiManager->getConfigPortalSSID());
+  display.drawString(0, 10, "And set up cam WiFi in:");
+  display.drawString(0, 20, IpAddress2String(WiFi.softAPIP()));
+  display.display();
+}
 
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+void saveConfigCallback() {
+  display.clear();
+  display.drawString(0, 0, "Saving configuration");
+  display.display();
+  delay(500);
+}
+
+/**
+ * Convert the IP to string so we can send the display
+ */
+String IpAddress2String(const IPAddress& ipAddress)
+{
+  return String(ipAddress[0]) + String(".") +\
+  String(ipAddress[1]) + String(".") +\
+  String(ipAddress[2]) + String(".") +\
+  String(ipAddress[3])  ;
 }
 
 void loop()
 {
     update_image();
-    delay(30000);
+    delay(10000);
 }
