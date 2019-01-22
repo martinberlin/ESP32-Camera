@@ -1,6 +1,7 @@
 #include "OV2640.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <WiFiClient.h>
 #include <WiFiManager.h>
 #include <ArduinoJson.h>
 #include "time.h"
@@ -16,11 +17,13 @@ SSD1306Wire display(OLED_ADDRESS, I2C_SDA, I2C_SCL, GEOMETRY_128_32);
 
 #define HTTPS_HOST              "www.bigiot.net"
 #define HTTPS_PORT              443
+#define HEARTBEAT_PORT          8181
 #define BIGIOT_API_KEY          ""      // Put your API Key here
 #define BIGIOT_DEVICE_ID        "9110"
 #define BIGIOT_INTERFACE_ID     "7832"
-const char *ssid =     "KabelBox-A210";         // Put your SSID here
-const char *password = "14237187131701431551";
+// Heartbeat configuration
+unsigned long lastCheckInTime = 0; //记录上次报到时间
+const unsigned long postingInterval = 30000; // 每隔40秒向服务器报到一次 (default 40000)
 
 long photoCount = 0;
 const char *ntpServer = "pool.ntp.org";
@@ -36,6 +39,7 @@ char *request_end = "\r\n--------------------------ef73a32d43e7f04d--\r\n";
 
 OV2640 cam;
 WiFiClientSecure client;
+WiFiClient heartbeatClient; // Used just for the device checkIn()
 StaticJsonBuffer<512> jsonBuffer;
 
 void update_image(void)
@@ -234,9 +238,41 @@ String IpAddress2String(const IPAddress& ipAddress)
   String(ipAddress[2]) + String(".") +\
   String(ipAddress[3])  ;
 }
+/**
+ * CheckIn every N seconds to bigiot to keep device online
+ */
+void checkIn() {
+    String msg = "{\"M\":\"checkin\",\"ID\":\"" + String(BIGIOT_DEVICE_ID) + "\",\"K\":\"" + BIGIOT_API_KEY + "\"}\n";
+    String request = "POST /\r\n";
+    request += "Host: www.bigiot.net\r\n";
+    request += "User-Agent: TTGO-Camera-Demo\r\n";
+    request += "Accept: */*\r\n";
+    request += "\r\n";
+
+     if (!heartbeatClient.connected()) {
+        byte attempts = 0;
+        while (!heartbeatClient.connect(HTTPS_HOST, HEARTBEAT_PORT)) {
+            attempts++;
+            Serial.print(".");
+            delay(500);
+            if (attempts>6) {
+                return;
+            }
+      }
+    heartbeatClient.print(request);
+    heartbeatClient.print(msg);
+    lastCheckInTime = millis(); 
+    Serial.println(msg); 
+    heartbeatClient.stop();
+    }
+
+}
+
 
 void loop()
 {
-    update_image();
-    delay(10000);
+    if(millis() - lastCheckInTime > postingInterval || lastCheckInTime==0) {
+        update_image();
+        checkIn();
+    }
 }
