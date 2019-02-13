@@ -4,9 +4,6 @@
 #include <WiFiClient.h>
 #include <WiFiManager.h> //https://github.com/tzapu/WiFiManager
 #include <ESPmDNS.h>
-
-// JPEG decoder library
-#include <JPEGDecoder.h>
 #define ENABLE_OLED 
 
 #ifdef ENABLE_OLED
@@ -16,17 +13,13 @@
 #define I2C_SCL 13
 SSD1306Wire display(OLED_ADDRESS, I2C_SDA, I2C_SCL, GEOMETRY_128_32);
 #endif
-
 char* localDomain        = "cam1";              // mDNS: cam1.local
 long photoCount = 0;
 OV2640 cam;
 WebServer server(80);
 
-
-
 void handle_jpg_stream(void)
 {
-  Serial.println("handle_jpg_stream called");
   WiFiClient client = server.client();
   String response = "HTTP/1.1 200 OK\r\n";
   response += "Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n";
@@ -86,23 +79,20 @@ void handleNotFound()
   server.send(200, "text/plain", message);
 }
 
-
 void setup()
 {
-  Serial.println("starting setup()");
   #ifdef ENABLE_OLED
   display.init();
   display.flipScreenVertically();
   display.setFont(ArialMT_Plain_10);
   #endif
-
   Serial.begin(115200);
   WiFiManager wifiManager;
     //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
   wifiManager.setAPCallback(configModeCallback);
   wifiManager.setBreakAfterConfig(true); // Without this saveConfigCallback does not get fired
   wifiManager.setSaveConfigCallback(saveConfigCallback);
-  wifiManager.autoConnect("AutoConnectAP"); 
+  wifiManager.autoConnect("AutoConnectAP");
   camera_config_t camera_config;
   camera_config.ledc_channel = LEDC_CHANNEL_0;
   camera_config.ledc_timer = LEDC_TIMER_0;
@@ -142,14 +132,13 @@ void setup()
   display.drawString(0, 10, "mDns: "+String(localDomain)+".local");
   display.display();
 
-  Serial.println("setup() done");
   server.on("/", HTTP_GET, handle_jpg_stream);
   server.on("/jpg", HTTP_GET, handle_jpg);
   server.onNotFound(handleNotFound);
   server.begin();
 }
 
- void configModeCallback (WiFiManager *myWiFiManager) {
+void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
   //if you used auto generated SSID, print it
@@ -158,7 +147,7 @@ void setup()
   display.drawString(0, 10, "And set up cam WiFi in:");
   display.drawString(0, 20, IpAddress2String(WiFi.softAPIP()));
   display.display();
-} 
+}
 
 void saveConfigCallback() {
   display.clear();
@@ -181,6 +170,5 @@ String IpAddress2String(const IPAddress& ipAddress)
 void loop()
 {
   server.handleClient();
-  //delay(400);
+  delay(400);
 }
-
