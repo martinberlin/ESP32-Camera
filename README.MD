@@ -16,6 +16,10 @@ In order to use the Station mode for video transmission quality, it should be as
 
 This library is based on [esp32-cam-demo](https://github.com/igrr/esp32-cam-demo) changes and is used in Arduino.
 
+# Get this camera model
+
+[esp32-cam in Aliexpress](https://de.aliexpress.com/store/product/TTGO-T-Journal-ESP32-Kamera-Modul-Entwicklung-Bord-OV2640-Kamera-SMA-Wifi-3dbi-Antenne-0-91/2090076_32952409255.html?isOrigTitle=true)
+
 # Installing
 To install this library:
 - Install [oled-ssd1306](https://github.com/ThingPulse/esp8266-oled-ssd1306),If you want to use oled.
