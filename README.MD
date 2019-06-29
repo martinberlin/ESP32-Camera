@@ -34,3 +34,6 @@ For more info, see https://www.arduino.cc/en/Guide/Libraries
 - In Sota-AP you should connect `TTGO-CAMERA` and password is "`12345678`" , enter `192.168.1.1` in the browser to access the video stream.
 - In the Station mode, If you use OLED ,you should enter the IP address displayed in the OLED for access. You can also enter the IP address in the log to access
 - If you run the [BIGIOT](https://www.bigiot.net/) sample program, you need to add the device ID, interface ID, and password to add your wifi account.
+
+## Companion projects 
+If you are interested in controlling addressable Leds with ESP32 and launching animations with short UDP commands check out our project [Remora](https://github.com/martinberlin/Remora)
